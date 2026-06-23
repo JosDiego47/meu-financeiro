@@ -8,6 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
 <style>
@@ -23,12 +24,23 @@ body{background:#f4f6f9;padding:20px;}
     margin-bottom:15px;
 }
 
-#themeBtn{
+.nav-actions {
+    display:flex;
+    gap:10px;
+}
+
+#themeBtn, .logout-btn{
     padding:10px;
     border:none;
     border-radius:8px;
     background:#333;
     color:white;
+    cursor:pointer;
+    width: auto;
+}
+
+.logout-btn {
+    background:#e74c3c;
 }
 
 .cards{
@@ -131,6 +143,51 @@ button{
     border-radius:10px;
 }
 
+/* TELA DE LOGIN */
+.auth-screen {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 80vh;
+}
+
+.auth-box {
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+}
+
+.auth-box h2 {
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.auth-box input {
+    margin-bottom: 12px;
+}
+
+.auth-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.btn-primary {
+    background: #3498db;
+    color: white;
+    border: none;
+}
+
+.auth-error {
+    color: #e74c3c;
+    margin-top: 12px;
+    font-size: 14px;
+}
+
 /* DARK */
 body.dark{
     background:#121212;
@@ -139,7 +196,8 @@ body.dark{
 
 body.dark .card,
 body.dark .form-area,
-body.dark .chart-box{
+body.dark .chart-box,
+body.dark .auth-box{
     background:#1e1e1e;
 }
 body.dark input,
@@ -153,10 +211,10 @@ body.dark .budget-badge {
     background:#2a2a2a;
     color:white;
 }
+body.dark .auth-box h2 {
+    color: white;
+}
 
-/* ==========================================
-   REGRAS DE RESPONSIVIDADE (TELEMOVEL)
-   ========================================== */
 @media (max-width: 768px) {
     body {
         padding: 10px;
@@ -188,11 +246,27 @@ body.dark .budget-badge {
 
 <body>
 
-<div class="container">
+<div id="authScreen" class="auth-screen">
+    <div class="auth-box">
+        <h2>🔐 Aceder ao Painel</h2>
+        <input type="email" id="authEmail" placeholder="E-mail">
+        <input type="password" id="authPassword" placeholder="Palavra-passe">
+        <div class="auth-buttons">
+            <button onclick="login()">Entrar</button>
+            <button onclick="register()" class="btn-primary">Criar Conta</button>
+        </div>
+        <div id="authError" class="auth-error"></div>
+    </div>
+</div>
+
+<div class="container" id="appContainer" style="display: none;">
 
 <div class="top-bar">
     <h2>💰 Finance Dashboard</h2>
-    <button id="themeBtn" onclick="toggleTheme()">🌙</button>
+    <div class="nav-actions">
+        <button id="themeBtn" onclick="toggleTheme()">🌙</button>
+        <button class="logout-btn" onclick="logout()">Sair 🚪</button>
+    </div>
 </div>
 
 <div class="cards">
@@ -277,7 +351,7 @@ body.dark .budget-badge {
 <script>
 
 // ==========================================
-// CONFIGURAÇÃO DO FIREBASE
+// CONFIGURAÇÃO DO FIREBASE (Com as suas chaves!)
 // ==========================================
 const firebaseConfig = {
     apiKey: "AIzaSyB7fCT8Z9nBOIVsi5QH1pHz40fSQK54BJg",
@@ -291,14 +365,82 @@ const firebaseConfig = {
 // Inicializar Firebase
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
-const docRef = db.collection("app").doc("financeiro");
 
+// Variáveis de controlo do utilizador e dados
+let docRef = null;
+let unsubscribeSnapshot = null;
 let categorias = {
     receita: ["💼 Salário", "📈 Investimentos", "🎁 Extras"],
     despesa: ["🍔 Alimentação", "🛵 Manutenção da Moto", "🚗🛵 Seguro de Carro e Moto", "🎮 Lazer", "🎮 Jogos de PC", "🏠 Contas"]
 };
 let budgets = {};
 let data = [];
+
+/* CONTROLO DE AUTENTICAÇÃO (SISTEMA DE LOGIN) */
+firebase.auth().onAuthStateChanged((user) => {
+    if (user) {
+        // Utilizador ligado -> Mostra o painel, esconde o login
+        document.getElementById("authScreen").style.display = "none";
+        document.getElementById("appContainer").style.display = "block";
+        document.getElementById("authError").innerText = "";
+
+        // Define o caminho da base de dados exclusivo deste ID de utilizador
+        docRef = db.collection("usuarios").doc(user.uid);
+
+        // Escuta os dados em tempo real para este utilizador específico
+        unsubscribeSnapshot = docRef.onSnapshot((doc) => {
+            if (doc.exists) {
+                const cloudData = doc.data();
+                data = cloudData.data || [];
+                budgets = cloudData.budgets || {};
+                categorias = cloudData.categorias || categorias;
+            } else {
+                // Se for uma conta nova, reinicia as variáveis para o padrão
+                data = [];
+                budgets = {};
+                categorias = {
+                    receita: ["💼 Salário", "📈 Investimentos", "🎁 Extras"],
+                    despesa: ["🍔 Alimentação", "🛵 Manutenção da Moto", "🚗🛵 Seguro de Carro e Moto", "🎮 Lazer", "🎮 Jogos de PC", "🏠 Contas"]
+                };
+            }
+            setCategories();
+            render();
+        });
+
+    } else {
+        // Utilizador desligado -> Mostra o login, esconde o painel
+        document.getElementById("authScreen").style.display = "flex";
+        document.getElementById("appContainer").style.display = "none";
+        
+        // Cancela a escuta da base de dados anterior
+        if (unsubscribeSnapshot) unsubscribeSnapshot();
+        docRef = null;
+    }
+});
+
+/* FUNÇÕES DE LOGIN, REGISTO E LOGOUT */
+function login() {
+    const email = document.getElementById("authEmail").value;
+    const pass = document.getElementById("authPassword").value;
+    if(!email || !pass) return alert("Preencha todos os campos!");
+
+    firebase.auth().signInWithEmailAndPassword(email, pass)
+        .catch(error => document.getElementById("authError").innerText = error.message);
+}
+
+function register() {
+    const email = document.getElementById("authEmail").value;
+    const pass = document.getElementById("authPassword").value;
+    if(!email || !pass) return alert("Preencha todos os campos!");
+
+    firebase.auth().createUserWithEmailAndPassword(email, pass)
+        .then(() => alert("Conta criada com sucesso!"))
+        .catch(error => document.getElementById("authError").innerText = error.message);
+}
+
+function logout() {
+    firebase.auth().signOut();
+}
 
 function normalize(str){
     return (str || "")
@@ -309,7 +451,9 @@ function normalize(str){
         .toLowerCase();
 }
 
+/* GUARDAR NA NUVEM */
 function save(){
+    if (!docRef) return;
     docRef.set({
         data: data,
         budgets: budgets,
@@ -336,6 +480,7 @@ function setCategories(){
     let t=document.getElementById("tipo").value;
     let c=document.getElementById("categoria");
 
+    if(!c) return;
     c.innerHTML="";
     categorias[t].forEach(i=>{
         let o=document.createElement("option");
@@ -511,18 +656,6 @@ function updateBudgetChart(){
 function toggleTheme(){
     document.body.classList.toggle("dark");
 }
-
-docRef.onSnapshot((doc) => {
-    if (doc.exists) {
-        const cloudData = doc.data();
-        data = cloudData.data || [];
-        budgets = cloudData.budgets || {};
-        categorias = cloudData.categorias || categorias;
-    }
-    setCategories();
-    render();
-});
-
 </script>
 
 </body>
