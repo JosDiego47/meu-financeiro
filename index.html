@@ -661,5 +661,11 @@ function toggleTheme(){
 }
 </script>
 
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js')
+      .then(() => console.log('Service Worker registrado com sucesso!'));
+  }
+</script>
 </body>
 </html>
