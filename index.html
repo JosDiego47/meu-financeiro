@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finance Dashboard Pro</title>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Scripts do Firebase (Versão Compat para funcionar direto via CDN) -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:Arial;}
+body{background:#f4f6f9;padding:20px;}
+
+.container{max-width:1100px;margin:auto;}
+
+.top-bar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:15px;
+}
+
+#themeBtn{
+    padding:10px;
+    border:none;
+    border-radius:8px;
+    background:#333;
+    color:white;
+}
+
+.cards{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:10px;
+    margin-bottom:15px;
+}
+
+.card{
+    background:white;
+    padding:15px;
+    border-radius:10px;
+}
+
+.card h3{font-size:12px;color:#666;}
+.card p{font-size:18px;font-weight:bold;}
+
+.receita{color:#2ecc71;}
+.despesa{color:#e74c3c;}
+.saldo{color:#3498db;}
+
+.form-area{
+    background:white;
+    padding:15px;
+    border-radius:10px;
+    margin-bottom:15px;
+}
+
+.form-grid{
+    display:grid;
+    grid-template-columns:repeat(6,1fr);
+    gap:8px;
+}
+
+input,select{
+    padding:8px;
+    border:1px solid #ddd;
+    border-radius:6px;
+}
+
+button{
+    cursor:pointer;
+    padding:8px;
+    border:1px solid #ddd;
+    border-radius:6px;
+    background:#f4f6f9;
+}
+
+.delete-btn{
+    background:#e74c3c;
+    color:white;
+    border:none;
+    padding:6px 10px;
+    border-radius:6px;
+}
+
+.budget-list {
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-top:10px;
+}
+
+.budget-badge {
+    background:#e0e0e0;
+    color:#333;
+    padding:6px 12px;
+    border-radius:20px;
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-size:13px;
+}
+
+.btn-x {
+    background:none;
+    border:none;
+    color:#e74c3c;
+    font-weight:bold;
+    cursor:pointer;
+    padding:0;
+}
+
+/* CHARTS */
+.charts{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:10px;
+    margin-bottom:15px;
+}
+
+.chart-box{
+    background:white;
+    padding:10px;
+    border-radius:10px;
+}
+
+/* DARK */
+body.dark{
+    background:#121212;
+    color:white;
+}
+
+body.dark .card,
+body.dark .form-area,
+body.dark .chart-box{
+    background:#1e1e1e;
+}
+body.dark input,
+body.dark select,
+body.dark button{
+    background:#2a2a2a;
+    color:white;
+    border-color:#444;
+}
+body.dark .budget-badge {
+    background:#2a2a2a;
+    color:white;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<div class="top-bar">
+    <h2>💰 Finance Dashboard</h2>
+    <button id="themeBtn" onclick="toggleTheme()">🌙</button>
+</div>
+
+<!-- CARDS -->
+<div class="cards">
+    <div class="card"><h3>Saldo Total</h3><p id="saldo">0</p></div>
+    <div class="card"><h3>💳 Banco</h3><p id="banco">0</p></div>
+    <div class="card"><h3>💵 Espécie</h3><p id="cash">0</p></div>
+</div>
+
+<!-- DINAMIC CATEGORIES FORM -->
+<div class="form-area">
+    <h3>🗂️ Criar Nova Categoria</h3>
+    <div class="form-grid">
+        <select id="novaCatTipo">
+            <option value="receita">Receita</option>
+            <option value="despesa">Despesa</option>
+        </select>
+        <input id="novaCatNome" placeholder="Nome (ex: 💇‍♂️ Cabeleireiro)">
+        <button onclick="addCategory()">Salvar Categoria</button>
+    </div>
+</div>
+
+<!-- ORÇAMENTO -->
+<div class="form-area">
+    <h3>📊 Orçamento</h3>
+    <div class="form-grid">
+        <select id="orcCategoria"></select>
+        <input id="orcValor" type="number" placeholder="Valor">
+        <button onclick="addBudget()">Adicionar Orçamento</button>
+    </div>
+    <div id="listaOrcamentos" class="budget-list"></div>
+</div>
+
+<!-- FORM MULTIUSO -->
+<div class="form-area">
+<div class="form-grid">
+
+<input type="date" id="data">
+
+<select id="tipo" onchange="setCategories()">
+    <option value="receita">Receita</option>
+    <option value="despesa">Despesa</option>
+</select>
+
+<select id="categoria"></select>
+
+<select id="fonte">
+    <option value="banco">💳 Banco</option>
+    <option value="cash">💵 Espécie</option>
+</select>
+
+<input type="text" id="descricao" placeholder="Descrição">
+<input type="number" id="valor" placeholder="Valor">
+
+<button onclick="add()">Adicionar</button>
+
+</div>
+</div>
+
+<!-- CHARTS -->
+<div class="charts">
+    <div class="chart-box"><canvas id="pie"></canvas></div>
+    <div class="chart-box"><canvas id="bar"></canvas></div>
+    <div class="chart-box"><canvas id="line"></canvas></div>
+    <div class="chart-box"><canvas id="budgetChart"></canvas></div>
+</div>
+
+<!-- TABLE -->
+<div class="form-area">
+<table width="100%">
+<thead>
+<tr>
+<th>Data</th>
+<th>Tipo</th>
+<th>Categoria</th>
+<th>Fonte</th>
+<th>Descrição</th>
+<th>Valor</th>
+<th>Ação</th>
+</tr>
+</thead>
+<tbody id="body"></tbody>
+</table>
+</div>
+
+</div>
+
+<script>
+
+// ==========================================
+// CONFIGURAÇÃO DO FIREBASE (Com as suas chaves!)
+// ==========================================
+const firebaseConfig = {
+    apiKey: "AIzaSyB7fCT8Z9nBOIVsi5QH1pHz40fSQK54BJg",
+    authDomain: "meu-financeiro-2fec1.firebaseapp.com",
+    projectId: "meu-financeiro-2fec1",
+    storageBucket: "meu-financeiro-2fec1.firebasestorage.app",
+    messagingSenderId: "527401735210",
+    appId: "1:527401735210:web:86198c25781f75a8a61f53"
+};
+
+// Inicializar Firebase
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const docRef = db.collection("app").doc("financeiro");
+
+// Valores padrão caso não exista nada no banco
+let categorias = {
+    receita: ["💼 Salário", "📈 Investimentos", "🎁 Extras"],
+    despesa: ["🍔 Alimentação", "🛵 Manutenção da Moto", "🚗🛵 Seguro de Carro e Moto", "🎮 Lazer", "🎮 Jogos de PC", "🏠 Contas"]
+};
+let budgets = {};
+let data = [];
+
+/* CHAVE LIMPA */
+function normalize(str){
+    return (str || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-zA-Z0-9 ]/g, "")
+        .trim()
+        .toLowerCase();
+}
+
+/* GUARDAR NA NUVEM (FIREBASE) */
+function save(){
+    docRef.set({
+        data: data,
+        budgets: budgets,
+        categorias: categorias
+    }).catch(error => console.error("Erro ao guardar na nuvem: ", error));
+}
+
+/* NOVA CATEGORIA */
+function addCategory(){
+    let tipo = document.getElementById("novaCatTipo").value;
+    let nome = document.getElementById("novaCatNome").value.trim();
+
+    if(!nome) return alert("Digite o nome da categoria!");
+
+    if(!categorias[tipo].includes(nome)){
+        categorias[tipo].push(nome);
+        save(); // Salva a categoria nova no firebase
+        document.getElementById("novaCatNome").value = "";
+    } else {
+        alert("Esta categoria já existe!");
+    }
+}
+
+/* ATUALIZAR CATEGORIAS NOS SELECTS */
+function setCategories(){
+    let t=document.getElementById("tipo").value;
+    let c=document.getElementById("categoria");
+
+    c.innerHTML="";
+    categorias[t].forEach(i=>{
+        let o=document.createElement("option");
+        o.value=i;
+        o.innerText=i;
+        c.appendChild(o);
+    });
+
+    let orcC = document.getElementById("orcCategoria");
+    if(orcC){
+        orcC.innerHTML = "";
+        categorias.despesa.forEach(i=>{
+            let o=document.createElement("option");
+            o.value=i;
+            o.innerText=i;
+            orcC.appendChild(o);
+        });
+    }
+}
+
+/* ADD TRANSAÇÃO */
+function add(){
+    let fonte=document.getElementById("fonte").value;
+    let valInput = document.getElementById("valor").value;
+
+    if(!valInput) return alert("Insira um valor!");
+
+    data.push({
+        id:Date.now(),
+        data:document.getElementById("data").value,
+        tipo:document.getElementById("tipo").value,
+        categoria:document.getElementById("categoria").value,
+        descricao:document.getElementById("descricao").value,
+        valor:+valInput,
+        fonte
+    });
+
+    save(); // Envia para o Firebase
+}
+
+/* DELETE TRANSAÇÃO */
+function del(id){
+    data=data.filter(i=>i.id!==id);
+    save();
+}
+
+/* ADICIONAR ORÇAMENTO */
+function addBudget(){
+    let cat=document.getElementById("orcCategoria").value;
+    let val=+document.getElementById("orcValor").value;
+
+    if(!cat) return alert("Selecione uma categoria!");
+
+    budgets[cat]=val;
+    save();
+}
+
+/* EXCLUIR ORÇAMENTO */
+function delBudget(cat){
+    delete budgets[cat];
+    save();
+}
+
+/* CHARTS INITS */
+let pie=new Chart(document.getElementById("pie"),{
+    type:"pie",
+    data:{labels:[],datasets:[{data:[],backgroundColor:[]}]}
+});
+
+let bar=new Chart(document.getElementById("bar"),{
+    type:"bar",
+    data:{labels:[],datasets:[{data:[],backgroundColor:[]}]}
+});
+
+let line=new Chart(document.getElementById("line"),{
+    type:"line",
+    data:{labels:[],datasets:[{data:[],borderColor:"#36a2eb",fill:true}]}
+});
+
+let budgetChart=new Chart(document.getElementById("budgetChart"),{
+    type:"bar",
+    data:{
+        labels:[],
+        datasets:[
+            {label:"Gasto",data:[],backgroundColor:"#e74c3c"},
+            {label:"Restante",data:[],backgroundColor:"#2ecc71"}
+        ]
+    }
+});
+
+/* RENDER */
+function render(){
+    let r=0;
+    let banco=0;
+    let cash=0;
+
+    document.getElementById("body").innerHTML="";
+
+    data.forEach(i=>{
+        if(i.tipo=="receita"){
+            r+=i.valor;
+            if(i.fonte=="cash") cash+=i.valor;
+            else banco+=i.valor;
+        }else{
+            if(i.fonte=="cash") cash-=i.valor;
+            else banco-=i.valor;
+        }
+
+        document.getElementById("body").innerHTML+=`
+        <tr>
+            <td>${i.data}</td>
+            <td>${i.tipo}</td>
+            <td>${i.categoria}</td>
+            <td>${i.fonte}</td>
+            <td>${i.descricao}</td>
+            <td>${i.valor}</td>
+            <td><button class="delete-btn" onclick="del(${i.id})">X</button></td>
+        </tr>`;
+    });
+
+    document.getElementById("saldo").innerText=(banco+cash);
+    document.getElementById("banco").innerText=banco;
+    document.getElementById("cash").innerText=cash;
+
+    updateBudgetChart();
+}
+
+/* GRÁFICO E LISTA DE ORÇAMENTOS */
+function updateBudgetChart(){
+    let labels=[];
+    let gastos=[];
+    let restos=[];
+    let hasBudget=false;
+
+    let listaContainer = document.getElementById("listaOrcamentos");
+    if(listaContainer) listaContainer.innerHTML = "";
+
+    for(let cat in budgets){
+        hasBudget=true;
+        let gasto=0;
+
+        data.forEach(t=>{
+            if(t.tipo==="despesa"){
+                if(normalize(t.categoria) === normalize(cat)){
+                    gasto += t.valor;
+                }
+            }
+        });
+
+        labels.push(cat);
+        gastos.push(gasto);
+
+        let restante = budgets[cat] - gasto;
+        restos.push(restante > 0 ? restante : 0);
+
+        if(listaContainer){
+            listaContainer.innerHTML += `
+                <div class="budget-badge">
+                    <span>${cat}: R$ ${budgets[cat]}</span>
+                    <button class="btn-x" onclick="delBudget('${cat}')">❌</button>
+                </div>
+            `;
+        }
+    }
+
+    if(!hasBudget){
+        budgetChart.data.labels=["Sem orçamento"];
+        budgetChart.data.datasets[0].data=[0];
+        budgetChart.data.datasets[1].data=[0];
+        budgetChart.update();
+        return;
+    }
+
+    budgetChart.data.labels=labels;
+    budgetChart.data.datasets[0].data=gastos;
+    budgetChart.data.datasets[1].data=restos;
+    budgetChart.update();
+}
+
+/* THEME */
+function toggleTheme(){
+    document.body.classList.toggle("dark");
+}
+
+// ==========================================
+// ESCUTA EM TEMPO REAL (Sincronização Automática)
+// ==========================================
+docRef.onSnapshot((doc) => {
+    if (doc.exists) {
+        const cloudData = doc.data();
+        data = cloudData.data || [];
+        budgets = cloudData.budgets || {};
+        categorias = cloudData.categorias || categorias;
+    }
+    setCategories();
+    render();
+});
+
+</script>
+
+</body>
+</html>
