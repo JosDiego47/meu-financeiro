@@ -5,10 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Finance Dashboard Pro</title>
 
-<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<!-- Scripts do Firebase (Versão Compat para funcionar direto via CDN) -->
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
@@ -70,6 +68,7 @@ input,select{
     padding:8px;
     border:1px solid #ddd;
     border-radius:6px;
+    width: 100%;
 }
 
 button{
@@ -78,6 +77,7 @@ button{
     border:1px solid #ddd;
     border-radius:6px;
     background:#f4f6f9;
+    width: 100%;
 }
 
 .delete-btn{
@@ -86,6 +86,7 @@ button{
     border:none;
     padding:6px 10px;
     border-radius:6px;
+    width: auto;
 }
 
 .budget-list {
@@ -113,6 +114,7 @@ button{
     font-weight:bold;
     cursor:pointer;
     padding:0;
+    width: auto;
 }
 
 /* CHARTS */
@@ -151,6 +153,36 @@ body.dark .budget-badge {
     background:#2a2a2a;
     color:white;
 }
+
+/* ==========================================
+   REGRAS DE RESPONSIVIDADE (TELEMOVEL)
+   ========================================== */
+@media (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+    .top-bar {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
+    .cards {
+        grid-template-columns: 1fr;
+    }
+    .form-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    .charts {
+        grid-template-columns: 1fr;
+    }
+    table {
+        font-size: 13px;
+    }
+    th, td {
+        padding: 6px 4px;
+    }
+}
 </style>
 </head>
 
@@ -163,14 +195,12 @@ body.dark .budget-badge {
     <button id="themeBtn" onclick="toggleTheme()">🌙</button>
 </div>
 
-<!-- CARDS -->
 <div class="cards">
     <div class="card"><h3>Saldo Total</h3><p id="saldo">0</p></div>
     <div class="card"><h3>💳 Banco</h3><p id="banco">0</p></div>
     <div class="card"><h3>💵 Espécie</h3><p id="cash">0</p></div>
 </div>
 
-<!-- DINAMIC CATEGORIES FORM -->
 <div class="form-area">
     <h3>🗂️ Criar Nova Categoria</h3>
     <div class="form-grid">
@@ -183,7 +213,6 @@ body.dark .budget-badge {
     </div>
 </div>
 
-<!-- ORÇAMENTO -->
 <div class="form-area">
     <h3>📊 Orçamento</h3>
     <div class="form-grid">
@@ -194,7 +223,6 @@ body.dark .budget-badge {
     <div id="listaOrcamentos" class="budget-list"></div>
 </div>
 
-<!-- FORM MULTIUSO -->
 <div class="form-area">
 <div class="form-grid">
 
@@ -220,7 +248,6 @@ body.dark .budget-badge {
 </div>
 </div>
 
-<!-- CHARTS -->
 <div class="charts">
     <div class="chart-box"><canvas id="pie"></canvas></div>
     <div class="chart-box"><canvas id="bar"></canvas></div>
@@ -228,8 +255,7 @@ body.dark .budget-badge {
     <div class="chart-box"><canvas id="budgetChart"></canvas></div>
 </div>
 
-<!-- TABLE -->
-<div class="form-area">
+<div class="form-area" style="overflow-x: auto;">
 <table width="100%">
 <thead>
 <tr>
@@ -251,7 +277,7 @@ body.dark .budget-badge {
 <script>
 
 // ==========================================
-// CONFIGURAÇÃO DO FIREBASE (Com as suas chaves!)
+// CONFIGURAÇÃO DO FIREBASE
 // ==========================================
 const firebaseConfig = {
     apiKey: "AIzaSyB7fCT8Z9nBOIVsi5QH1pHz40fSQK54BJg",
@@ -267,7 +293,6 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const docRef = db.collection("app").doc("financeiro");
 
-// Valores padrão caso não exista nada no banco
 let categorias = {
     receita: ["💼 Salário", "📈 Investimentos", "🎁 Extras"],
     despesa: ["🍔 Alimentação", "🛵 Manutenção da Moto", "🚗🛵 Seguro de Carro e Moto", "🎮 Lazer", "🎮 Jogos de PC", "🏠 Contas"]
@@ -275,7 +300,6 @@ let categorias = {
 let budgets = {};
 let data = [];
 
-/* CHAVE LIMPA */
 function normalize(str){
     return (str || "")
         .normalize("NFD")
@@ -285,7 +309,6 @@ function normalize(str){
         .toLowerCase();
 }
 
-/* GUARDAR NA NUVEM (FIREBASE) */
 function save(){
     docRef.set({
         data: data,
@@ -294,7 +317,6 @@ function save(){
     }).catch(error => console.error("Erro ao guardar na nuvem: ", error));
 }
 
-/* NOVA CATEGORIA */
 function addCategory(){
     let tipo = document.getElementById("novaCatTipo").value;
     let nome = document.getElementById("novaCatNome").value.trim();
@@ -303,14 +325,13 @@ function addCategory(){
 
     if(!categorias[tipo].includes(nome)){
         categorias[tipo].push(nome);
-        save(); // Salva a categoria nova no firebase
+        save();
         document.getElementById("novaCatNome").value = "";
     } else {
         alert("Esta categoria já existe!");
     }
 }
 
-/* ATUALIZAR CATEGORIAS NOS SELECTS */
 function setCategories(){
     let t=document.getElementById("tipo").value;
     let c=document.getElementById("categoria");
@@ -335,7 +356,6 @@ function setCategories(){
     }
 }
 
-/* ADD TRANSAÇÃO */
 function add(){
     let fonte=document.getElementById("fonte").value;
     let valInput = document.getElementById("valor").value;
@@ -352,16 +372,14 @@ function add(){
         fonte
     });
 
-    save(); // Envia para o Firebase
+    save();
 }
 
-/* DELETE TRANSAÇÃO */
 function del(id){
     data=data.filter(i=>i.id!==id);
     save();
 }
 
-/* ADICIONAR ORÇAMENTO */
 function addBudget(){
     let cat=document.getElementById("orcCategoria").value;
     let val=+document.getElementById("orcValor").value;
@@ -372,13 +390,11 @@ function addBudget(){
     save();
 }
 
-/* EXCLUIR ORÇAMENTO */
 function delBudget(cat){
     delete budgets[cat];
     save();
 }
 
-/* CHARTS INITS */
 let pie=new Chart(document.getElementById("pie"),{
     type:"pie",
     data:{labels:[],datasets:[{data:[],backgroundColor:[]}]}
@@ -405,7 +421,6 @@ let budgetChart=new Chart(document.getElementById("budgetChart"),{
     }
 });
 
-/* RENDER */
 function render(){
     let r=0;
     let banco=0;
@@ -442,7 +457,6 @@ function render(){
     updateBudgetChart();
 }
 
-/* GRÁFICO E LISTA DE ORÇAMENTOS */
 function updateBudgetChart(){
     let labels=[];
     let gastos=[];
@@ -494,14 +508,10 @@ function updateBudgetChart(){
     budgetChart.update();
 }
 
-/* THEME */
 function toggleTheme(){
     document.body.classList.toggle("dark");
 }
 
-// ==========================================
-// ESCUTA EM TEMPO REAL (Sincronização Automática)
-// ==========================================
 docRef.onSnapshot((doc) => {
     if (doc.exists) {
         const cloudData = doc.data();
